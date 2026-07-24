@@ -10,7 +10,10 @@ router.post('/login', authController.login);
 
 // Ruta para actualizar nombre y avatar del perfil
 router.put('/actualizar-perfil', protegerRuta, async (req, res) => {
-    const id_usuario = req.usuario.id;
+    
+    const tokenData = req.usuario || req.user; 
+    const id_usuario = tokenData.id;
+    
     const { nombre, avatar } = req.body;
 
     try {
