@@ -69,7 +69,7 @@ const login = async (req, res) => {
             return res.status(401).json({ mensaje: 'Credenciales inválidas.' });
         }
         
-        // Validación: cuenta activa
+        // Validación: Cuenta activa (Baja Lógica - Práctica 11)
         if (usuario.activo === false) {
             return res.status(403).json({
                 mensaje: 'Tu cuenta ha sido deshabilitada temporalmente por un Administrador. Contacta a soporte.'
@@ -93,7 +93,7 @@ const login = async (req, res) => {
 
         // Firmar Token con JWT incluyendo claims de autorización
         const token = jwt.sign(
-            { id: usuario.id_usuario, roles: roles, permisos: permisos },
+            { id: usuario.id_usuario, roles: roles, permisos: permisos, avatar: usuario.avatar },
             JWT_SECRET,
             { expiresIn: '3h' }
         );
@@ -101,7 +101,14 @@ const login = async (req, res) => {
         res.status(200).json({
             mensaje: 'Autenticación exitosa',
             token: token,
-            usuario: { nombre: usuario.nombre, email: usuario.email, roles: roles, permisos: permisos, avatar: avatar, }
+            usuario: { 
+                id_usuario: usuario.id_usuario, 
+                nombre: usuario.nombre, 
+                email: usuario.email, 
+                roles: roles, 
+                permisos: permisos, 
+                avatar: usuario.avatar 
+            }
         });
 
     } catch (error) {
