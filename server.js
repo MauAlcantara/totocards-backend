@@ -5,6 +5,7 @@ const productoRoutes = require('./routes/productoRoutes');
 const authRoutes = require('./routes/authRoutes');
 const pedidoRoutes = require('./routes/pedidoRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const pedidosRoutes = require('./routes/pedidosRoutes');
 
 // Importar la conexión a la base de datos
 const db = require('./config/db');
