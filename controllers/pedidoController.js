@@ -8,10 +8,12 @@ const crearPedido = async (req, res) => {
         return res.status(400).json({ mensaje: 'El carrito está vacío o los datos son inválidos.' });
     }
 
-    // 🔥 PEDIMOS UNA CONEXIÓN DEDICADA PARA LA TRANSACCIÓN
-    const client = await db.connect();
+    let client; 
 
     try {
+        // 🔥 AHORA SÍ: Metemos la conexión DENTRO de la zona segura
+        client = await db.connect();
+        
         await client.query('BEGIN');
 
         let totalCalculado = 0;
@@ -55,12 +57,17 @@ const crearPedido = async (req, res) => {
         res.status(201).json({ mensaje: '¡Compra exitosa! Tu pedido está siendo preparado.', id_pedido });
 
     } catch (error) {
-        await client.query('ROLLBACK');
+        // 🔥 Si el cliente se logró crear, deshacemos la compra
+        if (client) {
+            await client.query('ROLLBACK');
+        }
         console.error('Error procesando el checkout:', error);
-        res.status(400).json({ mensaje: error.message || 'Error al procesar el pago.' });
+        res.status(400).json({ mensaje: error.message || 'Error al conectar con la base de datos. Intenta de nuevo.' });
     } finally {
-        // 🔥 SIEMPRE DEBEMOS LIBERAR EL CLIENTE, PASE LO QUE PASE
-        client.release();
+        // 🔥 SIEMPRE liberamos la conexión al terminar, incluso si falló
+        if (client) {
+            client.release();
+        }
     }
 };
 

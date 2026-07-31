@@ -14,7 +14,7 @@ router.get('/mis-compras', protegerRuta, async (req, res) => {
         
         // Consultamos las compras del usuario logueado en la base de datos
         const resultado = await db.query(
-            'SELECT * FROM Pedidos WHERE id_usuario = $1 ORDER BY fecha DESC',
+            'SELECT * FROM Pedidos WHERE id_usuario = $1 ORDER BY fecha_creacion DESC',
             [id_usuario]
         );
         
