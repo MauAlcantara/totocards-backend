@@ -14,10 +14,18 @@ const crearPedido = async (req, res) => {
         client = await db.connect();
         await client.query('BEGIN');
 
-        let totalCalculado = 0;
+        // 🔥 OBTENEMOS LA FECHA EN EL SERVIDOR
+        const fechaActual = new Date();
+        const diaSemana = fechaActual.getDay();
+        const mesActual = fechaActual.getMonth();
+        const anioActual = fechaActual.getFullYear();
+
+        const esFinDeSemana = (diaSemana === 4 || diaSemana === 5 || diaSemana === 6 || diaSemana === 0);
+        const envioGratisVerano = (anioActual === 2026 && mesActual >= 5 && mesActual <= 7);
+
+        let subtotalCalculado = 0;
 
         for (let item of items) {
-            // 1. Consultamos los datos reales del producto en la BD
             const checkProducto = await client.query(
                 'SELECT nombre, stock, precio, estado FROM Productos WHERE id_producto = $1', 
                 [item.id_producto]
@@ -29,7 +37,6 @@ const crearPedido = async (req, res) => {
 
             const productoReal = checkProducto.rows[0];
 
-            // 🔥 VALIDACIÓN ACUMULADA DE PREVENTAS POR USUARIO
             if (productoReal.estado === 'PREVENTA') {
                 const consultaHistorial = await client.query(
                     `SELECT COALESCE(SUM(dp.cantidad), 0) AS total_comprado
@@ -40,35 +47,36 @@ const crearPedido = async (req, res) => {
                 );
 
                 const previasCompradas = parseInt(consultaHistorial.rows[0].total_comprado, 10);
-
-                // Si lo que ya compró en el pasado + lo que quiere comprar ahora supera 2:
                 if (previasCompradas + item.cantidad > 2) {
-                    const disponibles = Math.max(0, 2 - previasCompradas);
-                    if (disponibles === 0) {
-                        throw new Error(`Límite alcanzado: Ya has reservado el máximo permitido (2 unidades) de "${productoReal.nombre}" en compras anteriores.`);
-                    } else {
-                        throw new Error(`Límite superado: Ya compraste ${previasCompradas} unidad(es) de "${productoReal.nombre}". Solo puedes reservar ${disponibles} más.`);
-                    }
+                    throw new Error(`Límite alcanzado para la preventa "${productoReal.nombre}".`);
                 }
             }
 
-            // 2. Verificar Stock
             if (productoReal.stock < item.cantidad) {
                 throw new Error(`Stock insuficiente para: ${productoReal.nombre}. Solo quedan ${productoReal.stock}.`);
             }
 
-            totalCalculado += (productoReal.precio * item.cantidad);
-            item.precio_real = productoReal.precio;
+            // 🔥 APLICAMOS EL DESCUENTO EN EL BACKEND SI CUMPLE LA CONDICIÓN
+            let precioFinalItem = Number(productoReal.precio);
+            
+            if (esFinDeSemana && productoReal.nombre.toLowerCase().includes('elite trainer box')) {
+                precioFinalItem = precioFinalItem * 0.90; // 10% de descuento
+            }
+
+            subtotalCalculado += (precioFinalItem * item.cantidad);
+            item.precio_real = precioFinalItem;
         }
 
-        // 3. Crear el Pedido
+        // 🔥 SUMAMOS EL COSTO DE ENVÍO
+        const costoEnvio = envioGratisVerano ? 0 : 150.00;
+        const totalCalculado = subtotalCalculado + costoEnvio;
+
         const insercionPedido = await client.query(
             'INSERT INTO Pedidos (id_usuario, total, estado_pedido) VALUES ($1, $2, $3) RETURNING id_pedido',
             [id_usuario, totalCalculado, 'PAGADO']
         );
         const id_pedido = insercionPedido.rows[0].id_pedido;
 
-        // 4. Insertar Detalles y Descontar Stock
         for (let item of items) {
             await client.query(
                 'INSERT INTO Detalles_Pedido (id_pedido, id_producto, cantidad, precio_unitario) VALUES ($1, $2, $3, $4)',
@@ -84,23 +92,14 @@ const crearPedido = async (req, res) => {
         await client.query('COMMIT');
 
         const codigo_orden = `TCG-${String(id_pedido).padStart(4, '0')}`;
-
-        res.status(201).json({ 
-            mensaje: `¡Reserva exitosa! Tu pedido #${codigo_orden} está confirmado.`, 
-            id_pedido,
-            codigo_orden 
-        });
+        res.status(201).json({ mensaje: `¡Compra exitosa! Pedido #${codigo_orden} en preparación.`, id_pedido, codigo_orden });
 
     } catch (error) {
-        if (client) {
-            await client.query('ROLLBACK');
-        }
+        if (client) await client.query('ROLLBACK');
         console.error('Error procesando el checkout:', error);
         res.status(400).json({ mensaje: error.message || 'Error al conectar con la base de datos.' });
     } finally {
-        if (client) {
-            client.release();
-        }
+        if (client) client.release();
     }
 };
 
