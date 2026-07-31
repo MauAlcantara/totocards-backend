@@ -1,37 +1,56 @@
 const db = require('../config/db');
 
 const crearPedido = async (req, res) => {
-    // Obtenemos el ID del usuario desde el Token JWT (inyectado por el middleware)
+    // Obtenemos el ID del usuario desde el Token JWT
     const id_usuario = req.usuarioLogueado.id;
-    const { items, total } = req.body; 
-    // "items" será un arreglo que Angular nos mandará: [{id_producto, cantidad, precio_unitario}]
+    const { items } = req.body; 
+
+    // 1. Validar que el carrito no venga vacío o corrupto
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ mensaje: 'El carrito está vacío o los datos son inválidos.' });
+    }
 
     try {
         // Iniciamos una TRANSACCIÓN SQL (Todo o Nada)
         await db.query('BEGIN');
 
-        // 1. Crear el Pedido General
+        let totalCalculado = 0;
+
+        // 2. Recorremos los items para validar Stock y calcular el Precio REAL en el servidor
+        for (let item of items) {
+            const checkProducto = await db.query('SELECT nombre, stock, precio FROM Productos WHERE id_producto = $1', [item.id_producto]);
+            
+            if (checkProducto.rows.length === 0) {
+                throw new Error(`El producto con ID ${item.id_producto} ya no está disponible.`);
+            }
+
+            const productoReal = checkProducto.rows[0];
+
+            if (productoReal.stock < item.cantidad) {
+                throw new Error(`Stock insuficiente para: ${productoReal.nombre}. Solo quedan ${productoReal.stock}.`);
+            }
+
+            // Sumamos el precio real de la BD, no el que manda Angular (Seguridad e-commerce)
+            totalCalculado += (productoReal.precio * item.cantidad);
+            
+            // Guardamos el precio real temporalmente en el objeto para insertarlo en los detalles
+            item.precio_real = productoReal.precio;
+        }
+
+        // 3. Crear el Pedido General con el total protegido
         const insercionPedido = await db.query(
             'INSERT INTO Pedidos (id_usuario, total, estado_pedido) VALUES ($1, $2, $3) RETURNING id_pedido',
-            [id_usuario, total, 'PAGADO']
+            [id_usuario, totalCalculado, 'PAGADO']
         );
         const id_pedido = insercionPedido.rows[0].id_pedido;
 
-        // 2. Insertar cada producto en Detalles_Pedido y restar el Stock
+        // 4. Insertar cada detalle y descontar del inventario real
         for (let item of items) {
-            // Verificar que haya stock suficiente antes de cobrar
-            const checkStock = await db.query('SELECT stock, nombre FROM Productos WHERE id_producto = $1', [item.id_producto]);
-            if (checkStock.rows[0].stock < item.cantidad) {
-                throw new Error(`Stock insuficiente para la carta: ${checkStock.rows[0].nombre}`);
-            }
-
-            // Insertar el detalle
             await db.query(
                 'INSERT INTO Detalles_Pedido (id_pedido, id_producto, cantidad, precio_unitario) VALUES ($1, $2, $3, $4)',
-                [id_pedido, item.id_producto, item.cantidad, item.precio_unitario]
+                [id_pedido, item.id_producto, item.cantidad, item.precio_real]
             );
 
-            // Restar el inventario de la bóveda
             await db.query(
                 'UPDATE Productos SET stock = stock - $1 WHERE id_producto = $2',
                 [item.cantidad, item.id_producto]
@@ -43,7 +62,7 @@ const crearPedido = async (req, res) => {
         res.status(201).json({ mensaje: '¡Compra exitosa! Tu pedido está siendo preparado.', id_pedido });
 
     } catch (error) {
-        // Si hay CUALQUIER error (falta de stock, caída de red), deshacemos todo
+        // Si falta stock, si un precio no coincide o si la red se cae, deshacemos TODO
         await db.query('ROLLBACK');
         console.error('Error procesando el checkout:', error);
         res.status(400).json({ mensaje: error.message || 'Error al procesar el pago.' });
