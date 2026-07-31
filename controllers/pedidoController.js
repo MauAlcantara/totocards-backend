@@ -11,9 +11,7 @@ const crearPedido = async (req, res) => {
     let client; 
 
     try {
-        // 🔥 AHORA SÍ: Metemos la conexión DENTRO de la zona segura
         client = await db.connect();
-        
         await client.query('BEGIN');
 
         let totalCalculado = 0;
@@ -54,17 +52,22 @@ const crearPedido = async (req, res) => {
         }
 
         await client.query('COMMIT');
-        res.status(201).json({ mensaje: '¡Compra exitosa! Tu pedido está siendo preparado.', id_pedido });
+
+        const codigo_orden = `TCG-${String(id_pedido).padStart(4, '0')}`;
+
+        res.status(201).json({ 
+            mensaje: `¡Compra exitosa! Tu pedido #${codigo_orden} está siendo preparado.`, 
+            id_pedido,
+            codigo_orden 
+        });
 
     } catch (error) {
-        // 🔥 Si el cliente se logró crear, deshacemos la compra
         if (client) {
             await client.query('ROLLBACK');
         }
         console.error('Error procesando el checkout:', error);
         res.status(400).json({ mensaje: error.message || 'Error al conectar con la base de datos. Intenta de nuevo.' });
     } finally {
-        // 🔥 SIEMPRE liberamos la conexión al terminar, incluso si falló
         if (client) {
             client.release();
         }
