@@ -27,8 +27,8 @@ pool.on('connect', () => {
     console.log(`✅ Conexión exitosa a la base de datos de TotoCards (${isProduction ? 'Nube / Neon' : 'Local'})`);
 });
 
-pool.on('error', (err) => {
-    console.error('❌ Error inesperado en la base de datos', err);
+pool.on('error', (err, client) => {
+    console.error('⚠️ Conexión inactiva cerrada por Neon.tech (Se reconectará sola)');
 });
 
 module.exports = pool;
