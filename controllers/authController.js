@@ -50,6 +50,7 @@ const login = async (req, res) => {
         if (resultadoUsuario.rows.length === 0) {
             return res.status(401).json({ mensaje: 'Credenciales inválidas.' });
         }
+        
         const usuario = resultadoUsuario.rows[0];
 
         const passwordValida = await bcrypt.compare(password, usuario.password_hash);
@@ -76,10 +77,18 @@ const login = async (req, res) => {
         const roles = [...new Set(resultadoRoles.rows.map(row => row.nombre_rol))];
         const permisos = [...new Set(resultadoRoles.rows.filter(row => row.nombre_permiso).map(row => row.nombre_permiso))];
 
+        const payloadLigero = {
+            id: usuario.id_usuario,
+            nombre: usuario.nombre,
+            email: usuario.email,
+            roles: roles,
+            permisos: permisos
+        };
+
         const token = jwt.sign(
-            { id: usuario.id_usuario, roles: roles, permisos: permisos, avatar: usuario.avatar },
-            JWT_SECRET,
-            { expiresIn: '3h' }
+            payloadLigero, 
+            JWT_SECRET, 
+            { expiresIn: '8h' } 
         );
 
         res.status(200).json({
