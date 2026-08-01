@@ -34,4 +34,35 @@ router.get('/mis-compras', protegerRuta, async (req, res) => {
     }
 });
 
+router.get('/:id', protegerRuta, async (req, res) => {
+    try {
+        const id_pedido = req.params.id;
+        const id_usuario = req.usuarioLogueado.id;
+
+        // 1. Verificamos que el pedido exista y pertenezca al usuario logueado
+        const pedido = await db.query('SELECT * FROM Pedidos WHERE id_pedido = $1 AND id_usuario = $2', [id_pedido, id_usuario]);
+        
+        if (pedido.rows.length === 0) {
+            return res.status(404).json({ mensaje: 'Pedido no encontrado o no autorizado.' });
+        }
+
+        // 2. Traemos los artículos que venían en esa orden
+        const detalles = await db.query(`
+            SELECT dp.cantidad, dp.precio_unitario, prod.nombre, prod.imagen_url, prod.id_producto
+            FROM Detalles_Pedido dp
+            JOIN Productos prod ON dp.id_producto = prod.id_producto
+            WHERE dp.id_pedido = $1
+        `, [id_pedido]);
+
+        res.status(200).json({
+            pedido: pedido.rows[0],
+            detalles: detalles.rows
+        });
+
+    } catch (error) {
+        console.error('Error al obtener detalle del pedido:', error);
+        res.status(500).json({ mensaje: 'Error al cargar los detalles de la compra.' });
+    }
+});
+
 module.exports = router;
