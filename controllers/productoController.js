@@ -1,9 +1,7 @@
 const db = require('../config/db');
 
-// Función para obtener TODOS los productos
 const obtenerProductos = async (req, res) => {
     try {
-        // Hacemos la consulta a PostgreSQL
         const resultado = await db.query('SELECT * FROM Productos ORDER BY id_producto ASC');
         res.status(200).json(resultado.rows);
     } catch (error) {
@@ -12,7 +10,6 @@ const obtenerProductos = async (req, res) => {
     }
 };
 
-// Función para obtener UN SOLO producto por su ID (Para los Detalles de Producto)
 const obtenerProductoPorId = async (req, res) => {
     const { id } = req.params;
     try {
@@ -28,7 +25,6 @@ const obtenerProductoPorId = async (req, res) => {
         res.status(500).json({ mensaje: 'Error interno del servidor.' });
     }
 };
-// Función para obtener SOLO las preventas
 const obtenerPreventas = async (req, res) => {
     try {
         const resultado = await db.query("SELECT * FROM Productos WHERE estado = 'PREVENTA' ORDER BY fecha_lanzamiento ASC");
@@ -40,21 +36,19 @@ const obtenerPreventas = async (req, res) => {
 };
 
 const buscarProductos = async (req, res) => {
-    const { q } = req.query; // Capturamos el término de búsqueda de la URL (?q=charizard)
+    const { q } = req.query; 
     
     if (!q) {
-        return res.status(200).json([]); // Si no hay término, devolvemos arreglo vacío
+        return res.status(200).json([]); 
     }
 
     try {
-        // Usamos ILIKE para búsquedas parciales e insensibles a mayúsculas
         const consulta = `
             SELECT id_producto, nombre, imagen_url, precio, categoria 
             FROM Productos 
             WHERE nombre ILIKE $1 
             LIMIT 5
         `;
-        // El % rodea la palabra para buscarla en cualquier parte del nombre
         const resultado = await db.query(consulta, [`%${q}%`]); 
         
         res.status(200).json(resultado.rows);
@@ -64,7 +58,6 @@ const buscarProductos = async (req, res) => {
     }
 };
 
-// Exportamos las funciones para que las rutas las puedan usar
 module.exports = {
     obtenerProductos,
     obtenerProductoPorId,

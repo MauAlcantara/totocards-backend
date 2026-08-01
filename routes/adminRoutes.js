@@ -7,8 +7,6 @@ const { protegerRuta, requerirPermiso } = require('../middlewares/authMiddleware
 // RUTAS CRUD USUARIOS
 // ==========================================
 router.get('/usuarios', protegerRuta, requerirPermiso('ver_dashboard'), adminController.obtenerUsuarios);
-
-// 🔥 LAS 3 NUEVAS RUTAS
 router.post('/usuarios', protegerRuta, requerirPermiso('ver_dashboard'), adminController.crearUsuario);
 router.put('/usuarios/:id', protegerRuta, requerirPermiso('ver_dashboard'), adminController.actualizarUsuario);
 router.delete('/usuarios/:id', protegerRuta, requerirPermiso('ver_dashboard'), adminController.eliminarUsuario);

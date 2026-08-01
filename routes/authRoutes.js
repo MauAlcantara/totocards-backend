@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/db'); // ✅ Agregamos la importación de la BD
+const db = require('../config/db'); 
 const authController = require('../controllers/authController');
 const { protegerRuta } = require('../middlewares/authMiddleware');
 
@@ -10,10 +10,7 @@ router.post('/login', authController.login);
 
 // Ruta para actualizar nombre y avatar del perfil
 router.put('/actualizar-perfil', protegerRuta, async (req, res) => {
-    
-    // 🔥 SOLUCIÓN: Usamos exactamente el mismo nombre que le pusiste en el middleware
     const id_usuario = req.usuarioLogueado.id;
-    
     const { nombre, avatar } = req.body;
 
     try {

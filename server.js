@@ -5,15 +5,12 @@ const productoRoutes = require('./routes/productoRoutes');
 const authRoutes = require('./routes/authRoutes');
 const pedidoRoutes = require('./routes/pedidoRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-
-// Importar la conexión a la base de datos
 const db = require('./config/db');
-
 const app = express();
 
 // Middlewares obligatorios
-app.use(cors()); // Permite que Angular (puerto 4200) se comunique con Express sin bloqueos
-app.use(express.json()); // Permite que el servidor lea datos en formato JSON
+app.use(cors());
+app.use(express.json()); 
 
 app.use('/api/productos', productoRoutes);
 app.use('/api/auth', authRoutes); 

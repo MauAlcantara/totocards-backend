@@ -1,11 +1,10 @@
 const db = require('../config/db');
-const bcrypt = require('bcrypt'); // 🔥 NECESARIO PARA ENCRIPTAR CONTRASEÑAS AL CREAR USUARIOS
+const bcrypt = require('bcrypt');
 
 // ==========================================
-// CRUD USUARIOS (Crear, Leer, Actualizar, Eliminar, Cambiar Estado)
+// CRUD USUARIOS
 // ==========================================
 
-// 1. LEER USUARIOS
 const obtenerUsuarios = async (req, res) => {
     try {
         const resultado = await db.query('SELECT id_usuario, nombre, email, fecha_registro, activo FROM Usuarios ORDER BY id_usuario ASC');
@@ -16,31 +15,26 @@ const obtenerUsuarios = async (req, res) => {
     }
 };
 
-// 2. CREAR USUARIO (Desde el panel de Admin)
 const crearUsuario = async (req, res) => {
     const { nombre, email, password, rol } = req.body;
 
     try {
-        // Verificar existencia de correo
         const usuarioExistente = await db.query('SELECT * FROM Usuarios WHERE email = $1', [email]);
         if (usuarioExistente.rows.length > 0) {
             return res.status(400).json({ mensaje: 'Este correo ya está registrado.' });
         }
 
-        // Hash de contraseña
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
         await db.query('BEGIN');
 
-        // Insertar usuario
         const insercionUsuario = await db.query(
             'INSERT INTO Usuarios (nombre, email, password_hash) VALUES ($1, $2, $3) RETURNING id_usuario, nombre, email, fecha_registro, activo',
             [nombre, email, passwordHash]
         );
         const nuevoUsuario = insercionUsuario.rows[0];
 
-        // Buscar el ID del rol seleccionado (por defecto será 'Usuario' si no envían nada)
         const nombreRol = rol || 'Usuario';
         const buscarRol = await db.query("SELECT id_rol FROM Roles WHERE nombre_rol = $1", [nombreRol]);
         
@@ -61,7 +55,6 @@ const crearUsuario = async (req, res) => {
     }
 };
 
-// 3. ACTUALIZAR USUARIO (Editar nombre o email)
 const actualizarUsuario = async (req, res) => {
     const { id } = req.params;
     const { nombre, email } = req.body;
@@ -86,17 +79,14 @@ const actualizarUsuario = async (req, res) => {
     }
 };
 
-// 4. ELIMINAR USUARIO (Hard Delete)
 const eliminarUsuario = async (req, res) => {
     const { id } = req.params;
 
     try {
         await db.query('BEGIN');
         
-        // Primero debemos eliminar sus permisos en la tabla intermedia
         await db.query('DELETE FROM Usuario_Rol WHERE id_usuario = $1', [id]);
 
-        // Luego intentamos eliminar al usuario
         const resultado = await db.query('DELETE FROM Usuarios WHERE id_usuario = $1 RETURNING *', [id]);
 
         if (resultado.rows.length === 0) {
@@ -109,7 +99,6 @@ const eliminarUsuario = async (req, res) => {
     } catch (error) {
         await db.query('ROLLBACK');
         console.error('Error al eliminar usuario:', error);
-        // Si tiene historial de compras (Código 23503 es Violación de Llave Foránea en PostgreSQL)
         if (error.code === '23503') {
             return res.status(400).json({ mensaje: 'No se puede eliminar: El usuario tiene compras registradas. Te sugerimos "Deshabilitarlo".' });
         }
@@ -117,7 +106,6 @@ const eliminarUsuario = async (req, res) => {
     }
 };
 
-// 5. CAMBIAR ESTADO (Soft Delete)
 const cambiarEstadoUsuario = async (req, res) => {
     const { id } = req.params;
     const { activo } = req.body;
@@ -134,9 +122,9 @@ const cambiarEstadoUsuario = async (req, res) => {
 };
 
 // ==========================================
-// CRUD PRODUCTOS (Ya estaban listos)
+// CRUD PRODUCTOS
 // ==========================================
-const crearProducto = async (req, res) => { /* Código intacto... */ 
+const crearProducto = async (req, res) => { 
     const { nombre, descripcion, precio, stock, categoria, expansion, imagen_url, estado, fecha_lanzamiento } = req.body;
     try {
         const consulta = `INSERT INTO Productos (nombre, descripcion, precio, stock, categoria, expansion, imagen_url, estado, fecha_lanzamiento) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`;
@@ -146,7 +134,7 @@ const crearProducto = async (req, res) => { /* Código intacto... */
     } catch (error) { res.status(500).json({ mensaje: 'Error interno al registrar el producto.' }); }
 };
 
-const actualizarProducto = async (req, res) => { /* Código intacto... */ 
+const actualizarProducto = async (req, res) => { 
     const { id } = req.params;
     const { nombre, descripcion, precio, stock, categoria, expansion, imagen_url, estado, fecha_lanzamiento } = req.body;
     try {
@@ -158,7 +146,7 @@ const actualizarProducto = async (req, res) => { /* Código intacto... */
     } catch (error) { res.status(500).json({ mensaje: 'Error al actualizar el producto.' }); }
 };
 
-const eliminarProducto = async (req, res) => { /* Código intacto... */ 
+const eliminarProducto = async (req, res) => {
     const { id } = req.params;
     try {
         const resultado = await db.query('DELETE FROM Productos WHERE id_producto = $1 RETURNING *', [id]);

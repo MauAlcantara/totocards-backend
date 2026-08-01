@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secreto_totocards_2026';
 
-// Middleware 1: Verificar validez del Token (Autenticación)
 const protegerRuta = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -12,14 +11,13 @@ const protegerRuta = (req, res, next) => {
 
     try {
         const verificado = jwt.verify(token, JWT_SECRET);
-        req.usuarioLogueado = verificado; // Inyectamos los claims del usuario en la petición
+        req.usuarioLogueado = verificado; 
         next();
     } catch (error) {
         return res.status(403).json({ mensaje: 'Sesión inválida o expirada.' });
     }
 };
 
-// Middleware 2: Restringir por Roles o Permisos (Autorización)
 const requerirPermiso = (permisoRequerido) => {
     return (req, res, next) => {
         const { permisos } = req.usuarioLogueado;

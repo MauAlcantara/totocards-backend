@@ -1,7 +1,6 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// 1. Verificamos si estamos en producción (Render/Neon) leyendo DATABASE_URL
 const isProduction = !!process.env.DATABASE_URL;
 
 const pool = new Pool(
@@ -10,11 +9,11 @@ const pool = new Pool(
               // Configuración para Render / Neon.tech
               connectionString: process.env.DATABASE_URL,
               ssl: {
-                  rejectUnauthorized: false // Obligatorio para Neon en la nube
+                  rejectUnauthorized: false 
               }
           }
         : {
-              // Configuración para Desarrollo Local (tu computadora)
+              // Configuración para Desarrollo Local 
               user: process.env.DB_USER || 'postgres',
               host: process.env.DB_HOST || 'localhost',
               database: process.env.DB_NAME || 'totocards_db',

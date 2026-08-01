@@ -14,7 +14,6 @@ const crearPedido = async (req, res) => {
         client = await db.connect();
         await client.query('BEGIN');
 
-        // 🔥 OBTENEMOS LA FECHA EN EL SERVIDOR
         const fechaActual = new Date();
         const diaSemana = fechaActual.getDay();
         const mesActual = fechaActual.getMonth();
@@ -56,7 +55,6 @@ const crearPedido = async (req, res) => {
                 throw new Error(`Stock insuficiente para: ${productoReal.nombre}. Solo quedan ${productoReal.stock}.`);
             }
 
-            // 🔥 APLICAMOS EL DESCUENTO EN EL BACKEND SI CUMPLE LA CONDICIÓN
             let precioFinalItem = Number(productoReal.precio);
             
             if (esFinDeSemana && productoReal.nombre.toLowerCase().includes('elite trainer box')) {
@@ -67,7 +65,6 @@ const crearPedido = async (req, res) => {
             item.precio_real = precioFinalItem;
         }
 
-        // 🔥 SUMAMOS EL COSTO DE ENVÍO
         const costoEnvio = envioGratisVerano ? 0 : 150.00;
         const totalCalculado = subtotalCalculado + costoEnvio;
 

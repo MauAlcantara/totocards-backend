@@ -4,15 +4,13 @@ const db = require('../config/db');
 const pedidoController = require('../controllers/pedidoController');
 const { protegerRuta, requerirPermiso } = require('../middlewares/authMiddleware');
 
-// 1. Ruta de Checkout: Requiere token y permiso de 'realizar_checkout'
+// Ruta de Checkout
 router.post('/checkout', protegerRuta, requerirPermiso('realizar_checkout'), pedidoController.crearPedido);
 
-// 2. Ruta de Mis Compras: Requiere token activo para consultar historial
+// Ruta de Mis Compras
 router.get('/mis-compras', protegerRuta, async (req, res) => {
     try {
         const id_usuario = req.usuarioLogueado.id;
-        
-        // 🔥 CONSULTA AVANZADA: Usa EXISTS para saber si el pedido incluye una Preventa
         const consultaSQL = `
             SELECT p.*,
                    EXISTS (
@@ -39,14 +37,12 @@ router.get('/:id', protegerRuta, async (req, res) => {
         const id_pedido = req.params.id;
         const id_usuario = req.usuarioLogueado.id;
 
-        // 1. Verificamos que el pedido exista y pertenezca al usuario logueado
         const pedido = await db.query('SELECT * FROM Pedidos WHERE id_pedido = $1 AND id_usuario = $2', [id_pedido, id_usuario]);
         
         if (pedido.rows.length === 0) {
             return res.status(404).json({ mensaje: 'Pedido no encontrado o no autorizado.' });
         }
 
-        // 2. Traemos los artículos que venían en esa orden
         const detalles = await db.query(`
             SELECT dp.cantidad, dp.precio_unitario, prod.nombre, prod.imagen_url, prod.id_producto
             FROM Detalles_Pedido dp
