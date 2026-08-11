@@ -5,6 +5,7 @@ const productoRoutes = require('./routes/productoRoutes');
 const authRoutes = require('./routes/authRoutes');
 const pedidoRoutes = require('./routes/pedidoRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const contactoRoutes = require('./routes/contactoRoutes');
 const db = require('./config/db');
 const app = express();
 
@@ -16,6 +17,7 @@ app.use('/api/productos', productoRoutes);
 app.use('/api/auth', authRoutes); 
 app.use('/api/pedidos', pedidoRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/contacto', contactoRoutes);
 
 // Ruta de prueba
 app.get('/', (req, res) => {
