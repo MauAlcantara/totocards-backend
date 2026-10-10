@@ -12,8 +12,14 @@ const obtenerProductos = async (req, res) => {
 
 const obtenerProductoPorId = async (req, res) => {
     const { id } = req.params;
+    const idNum = parseInt(id, 10);
+
+    if (isNaN(idNum) || idNum <= 0) {
+        return res.status(400).json({ mensaje: 'El identificador del producto es inválido.' });
+    }
+
     try {
-        const resultado = await db.query('SELECT * FROM Productos WHERE id_producto = $1', [id]);
+        const resultado = await db.query('SELECT * FROM Productos WHERE id_producto = $1', [idNum]);
         
         if (resultado.rows.length === 0) {
             return res.status(404).json({ mensaje: 'Carta o caja no encontrada en el inventario.' });
@@ -38,9 +44,11 @@ const obtenerPreventas = async (req, res) => {
 const buscarProductos = async (req, res) => {
     const { q } = req.query; 
     
-    if (!q) {
+    if (!q || typeof q !== 'string' || q.trim() === '') {
         return res.status(200).json([]); 
     }
+
+    const querySeguro = q.trim().substring(0, 50);
 
     try {
         const consulta = `
@@ -49,7 +57,7 @@ const buscarProductos = async (req, res) => {
             WHERE nombre ILIKE $1 
             LIMIT 5
         `;
-        const resultado = await db.query(consulta, [`%${q}%`]); 
+        const resultado = await db.query(consulta, [`%${querySeguro}%`]); 
         
         res.status(200).json(resultado.rows);
     } catch (error) {

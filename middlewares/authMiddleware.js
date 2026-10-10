@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secreto_totocards_2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+    throw new Error('FATAL: La variable de entorno JWT_SECRET no está configurada.');
+}
 
 const protegerRuta = (req, res, next) => {
     const authHeader = req.headers['authorization'];
