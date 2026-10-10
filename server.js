@@ -9,29 +9,46 @@ const contactoRoutes = require('./routes/contactoRoutes');
 const db = require('./config/db');
 const app = express();
 
-// Configuración restrictiva de CORS (seguridad de dominios autorizados)
-const origenesPermitidos = process.env.ALLOWED_ORIGINS
+// Configuración de CORS con soporte para Vercel y dominios autorizados
+const origenesConfigurados = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : [
-        'http://localhost:4200',
-        'http://localhost:3000',
-        'https://totocards.vercel.app',
-        'https://totocards-app.vercel.app'
-      ];
+    : [];
 
-app.use(cors({
+const origenesPorDefecto = [
+    'http://localhost:4200',
+    'http://localhost:3000',
+    'https://totocards-frontend.vercel.app',
+    'https://totocards.vercel.app',
+    'https://totocards-app.vercel.app'
+];
+
+const todosLosOrigenes = [...new Set([...origenesPorDefecto, ...origenesConfigurados])];
+
+const corsOptions = {
     origin: (origin, callback) => {
-        // Permitir peticiones sin origen (ej. curl, Postman o health checks en despliegue) o desde dominios autorizados
-        if (!origin || origenesPermitidos.includes(origin)) {
+        // Permitir peticiones sin origen (ej. curl, Postman o SSR server-to-server)
+        if (!origin) {
+            return callback(null, true);
+        }
+
+        // Permitir si está en la lista explícita o coincide con dominios/previews de TotoCards en Vercel
+        const esPermitido = todosLosOrigenes.includes(origin) || 
+            /^https:\/\/totocards([a-zA-Z0-9-]*)\.vercel\.app$/.test(origin);
+
+        if (esPermitido) {
             callback(null, true);
         } else {
-            callback(new Error('Acceso no autorizado por la política CORS de TotoCards.'));
+            console.warn(`[CORS] Origen bloqueado por política de seguridad: ${origin}`);
+            callback(null, false);
         }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json({ limit: '3mb' })); 
 

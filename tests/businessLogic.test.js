@@ -50,6 +50,20 @@ function determinarEstadoInicial(metodoPago) {
     return (metodoPago === 'spei') ? 'PENDIENTE' : 'PAGADO';
 }
 
+// 7. Validación de orígenes autorizados CORS
+function esOrigenPermitido(origin, origenesConfigurados = []) {
+    if (!origin) return true;
+    const origenesPorDefecto = [
+        'http://localhost:4200',
+        'http://localhost:3000',
+        'https://totocards-frontend.vercel.app',
+        'https://totocards.vercel.app',
+        'https://totocards-app.vercel.app'
+    ];
+    const todos = [...new Set([...origenesPorDefecto, ...origenesConfigurados])];
+    return todos.includes(origin) || /^https:\/\/totocards([a-zA-Z0-9-]*)\.vercel\.app$/.test(origin);
+}
+
 // ==========================================
 // SUITE DE PRUEBAS QA DE LÓGICA DE NEGOCIO
 // ==========================================
@@ -136,4 +150,13 @@ test('QA Pasarela de Pagos: Estado inicial según método de pago', () => {
     assert.strictEqual(determinarEstadoInicial('spei'), 'PENDIENTE', 'SPEI debe esperar transferencia bancaria');
     assert.strictEqual(determinarEstadoInicial('tarjeta'), 'PAGADO', 'Tarjeta aprobada debe quedar PAGADO');
     assert.strictEqual(determinarEstadoInicial('paypal'), 'PAGADO', 'PayPal aprobado debe quedar PAGADO');
+});
+
+test('QA Seguridad CORS: Permite totocards-frontend.vercel.app y despliegues autorizados', () => {
+    assert.strictEqual(esOrigenPermitido('https://totocards-frontend.vercel.app'), true, 'Debe permitir el frontend oficial en Vercel');
+    assert.strictEqual(esOrigenPermitido('https://totocards-frontend-git-main.vercel.app'), true, 'Debe permitir subdominios preview de Vercel');
+    assert.strictEqual(esOrigenPermitido('https://totocards.vercel.app'), true, 'Debe permitir dominio alternativo en Vercel');
+    assert.strictEqual(esOrigenPermitido('http://localhost:4200'), true, 'Debe permitir localhost en desarrollo');
+    assert.strictEqual(esOrigenPermitido(null), true, 'Peticiones sin origen (móvil, curl) permitidas');
+    assert.strictEqual(esOrigenPermitido('https://sitio-malicioso.com'), false, 'Sitios ajenos bloqueados');
 });
