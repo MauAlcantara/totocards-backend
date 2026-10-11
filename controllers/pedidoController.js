@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const wearableController = require('./wearableController');
 
 const crearPedido = async (req, res) => {
     const id_usuario = req.usuarioLogueado.id;
@@ -119,6 +120,18 @@ const crearPedido = async (req, res) => {
         const mensajeConfirmacion = (metodo_pago === 'spei')
             ? `¡Orden registrada! Pedido #${codigo_orden} pendiente de conciliación bancaria SPEI.`
             : `¡Compra asegurada! Pedido #${codigo_orden} en preparación.`;
+
+        // Notificación automática al Wear OS del usuario
+        try {
+            wearableController.encolarNotificacionParaUsuario(id_usuario, {
+                titulo: '¡Compra Exitosa!',
+                mensaje: `Pedido #${codigo_orden} - $${totalCalculado.toFixed(2)}`,
+                icono: 'compra',
+                vibrar: true
+            });
+        } catch (e) {
+            console.warn('No se pudo encolar notificación para smartwatch:', e);
+        }
 
         res.status(201).json({ 
             mensaje: mensajeConfirmacion, 
