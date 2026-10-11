@@ -1,30 +1,33 @@
 // Controlador de Telemetría y Notificaciones para Wear OS / Dispositivos Inteligentes
-// Arquitectura Multi-Tenant por Usuario (Smartwatch desacoplado por cuenta)
 
-// Mapas de persistencia en memoria indexados por ID de usuario
+// Estado global activo de sincronización directa entre Emulador y Dashboard Web
+let estadoGlobal = {
+    conectado: true,
+    dispositivo: 'Wear OS Emulator (XL Round)',
+    modelo: 'Wear OS · 1.28"',
+    protocolo: 'Bridge HTTP / 10.0.2.2 (GATT Emulado)',
+    bpm: 78,
+    bateria: 100,
+    modo: 'MODO APERTURA',
+    latenciaMs: 150,
+    pulsoBasal: 70,
+    ultimaLectura: new Date().toISOString()
+};
+
+let colaGlobal = [];
+
+// Mapas opcionales por usuario (para aislamiento cuando se requiera vincular/desvincular cuentas específicas)
 const estadosPorUsuario = new Map();
 const notificacionesPorUsuario = new Map();
 let ultimoUsuarioVinculado = '1';
 
-// Estado inicial: ¡Desvinculado por defecto para todos los usuarios!
 const getEstadoDefecto = () => ({
-    conectado: false, // Desvinculado por defecto
-    dispositivo: 'Wear OS XL Round',
-    modelo: 'Wear OS · 1.28"',
-    protocolo: 'Bridge HTTP / 10.0.2.2 (GATT Emulado)',
-    bpm: 0,
-    bateria: 100,
-    modo: 'DESCONECTADO',
-    latenciaMs: 150,
-    pulsoBasal: 70,
-    ultimaLectura: null
+    ...estadoGlobal,
+    conectado: true,
+    bpm: estadoGlobal.bpm || 78,
+    ultimaLectura: new Date().toISOString()
 });
 
-// Resuelve el ID del usuario objetivo:
-// 1. Token JWT en sesión activa (req.usuarioLogueado.id)
-// 2. Header explícito 'x-user-id'
-// 3. Campo 'id_usuario' en body o query
-// 4. Último usuario que vinculó su reloj en la sesión del servidor (o '1')
 const resolverIdUsuario = (req) => {
     if (req.usuarioLogueado && req.usuarioLogueado.id) {
         return String(req.usuarioLogueado.id);
@@ -69,6 +72,7 @@ const recibirTelemetria = (req, res) => {
         const bpmNum = parseInt(bpm, 10);
         if (!isNaN(bpmNum) && bpmNum >= 30 && bpmNum <= 240) {
             estado.bpm = bpmNum;
+            estadoGlobal.bpm = bpmNum;
         }
     }
 
@@ -76,39 +80,65 @@ const recibirTelemetria = (req, res) => {
         const batNum = parseInt(bateria, 10);
         if (!isNaN(batNum) && batNum >= 0 && batNum <= 100) {
             estado.bateria = batNum;
+            estadoGlobal.bateria = batNum;
         }
     }
 
-    if (modo) estado.modo = String(modo).trim();
-    if (dispositivo) estado.dispositivo = String(dispositivo).trim();
-    if (latenciaMs) estado.latenciaMs = Number(latenciaMs);
+    if (modo) {
+        estado.modo = String(modo).trim();
+        estadoGlobal.modo = String(modo).trim();
+    }
+    if (dispositivo) {
+        estado.dispositivo = String(dispositivo).trim();
+        estadoGlobal.dispositivo = String(dispositivo).trim();
+    }
+    if (latenciaMs) {
+        estado.latenciaMs = Number(latenciaMs);
+        estadoGlobal.latenciaMs = Number(latenciaMs);
+    }
 
+    // El emulador está transmitiendo activamente, por lo que el enlace está 100% activo
+    estado.conectado = true;
+    estadoGlobal.conectado = true;
     estado.ultimaLectura = new Date().toISOString();
+    estadoGlobal.ultimaLectura = estado.ultimaLectura;
 
-    // Detección automática de pico crítico para generar alerta háptica
-    if (estado.conectado && estado.bpm > 95) {
-        cola.push({
+    // Detección de picos para alertas hápticas en el reloj
+    if (estado.bpm > 95) {
+        const alertaPico = {
             id: Date.now(),
             titulo: '¡Alerta de Pulso!',
             mensaje: `Pico de ${estado.bpm} BPM alcanzado`,
             icono: 'corazon',
             vibrar: true,
             timestamp: new Date().toISOString()
-        });
+        };
+        cola.push(alertaPico);
+        colaGlobal.push(alertaPico);
     }
 
     res.status(200).json({
         mensaje: 'Telemetría registrada correctamente',
         id_usuario: idUsuario,
+        conectado: true,
         estado: estado
     });
 };
 
-// Consultar telemetría actual del usuario (GET /api/wearable/telemetria)
+// Consultar telemetría actual (GET /api/wearable/telemetria)
 const obtenerTelemetria = (req, res) => {
     const idUsuario = resolverIdUsuario(req);
     const estado = obtenerEstadoUsuario(idUsuario);
-    res.status(200).json({ ...estado, id_usuario: idUsuario });
+    
+    // Si el estado por usuario tiene BPM, usarlo; de lo contrario sincronizar con el estado global activo
+    const telemetriaFinal = {
+        ...estadoGlobal,
+        ...estado,
+        bpm: (estado.bpm && estado.bpm > 0) ? estado.bpm : estadoGlobal.bpm,
+        conectado: estado.conectado !== undefined ? estado.conectado : estadoGlobal.conectado
+    };
+
+    res.status(200).json({ ...telemetriaFinal, id_usuario: idUsuario });
 };
 
 // Probar vibración háptica en el reloj (POST /api/wearable/vibrar)
@@ -125,6 +155,7 @@ const probarVibracion = (req, res) => {
         timestamp: new Date().toISOString()
     };
     cola.push(nuevaAlerta);
+    colaGlobal.push(nuevaAlerta);
 
     res.status(200).json({
         mensaje: 'Señal de vibración enviada al smartwatch',
@@ -143,7 +174,6 @@ const enviarNotificacion = (req, res) => {
         return res.status(400).json({ mensaje: 'Título y mensaje son requeridos para la notificación.' });
     }
 
-    // Regla de concisión técnica en pantalla circular (setContentTitle / setContentText)
     const tituloConciso = String(titulo).trim().slice(0, 30);
     const mensajeCondensado = String(mensaje).trim().slice(0, 45);
 
@@ -157,6 +187,7 @@ const enviarNotificacion = (req, res) => {
     };
 
     cola.push(notificacion);
+    colaGlobal.push(notificacion);
 
     res.status(201).json({
         mensaje: 'Notificación encolada para Wear OS',
@@ -169,8 +200,11 @@ const enviarNotificacion = (req, res) => {
 const consumirNotificaciones = (req, res) => {
     const idUsuario = resolverIdUsuario(req);
     const cola = obtenerColaUsuario(idUsuario);
-    const pendientes = [...cola];
+    
+    // Consumir tanto de la cola del usuario como de la cola global
+    const pendientes = [...cola, ...colaGlobal];
     notificacionesPorUsuario.set(String(idUsuario), []);
+    colaGlobal = [];
 
     res.status(200).json({
         id_usuario: idUsuario,
@@ -185,37 +219,38 @@ const recalibrarPulsoBasal = (req, res) => {
     const estado = obtenerEstadoUsuario(idUsuario);
     const { pulsoBasal } = req.body;
 
-    if (pulsoBasal && !isNaN(Number(pulsoBasal))) {
-        estado.pulsoBasal = Number(pulsoBasal);
-    } else {
-        estado.pulsoBasal = estado.bpm || 70;
-    }
+    const valor = (pulsoBasal && !isNaN(Number(pulsoBasal))) ? Number(pulsoBasal) : (estado.bpm || 70);
+    estado.pulsoBasal = valor;
+    estadoGlobal.pulsoBasal = valor;
 
     res.status(200).json({
         mensaje: 'Pulso basal recalibrado',
         id_usuario: idUsuario,
-        pulsoBasal: estado.pulsoBasal
+        pulsoBasal: valor
     });
 };
 
-// Desvincular / Vincular dispositivo individual por usuario (POST /api/wearable/estado)
+// Desvincular / Vincular dispositivo (POST /api/wearable/estado)
 const cambiarEstadoConexion = (req, res) => {
     const idUsuario = resolverIdUsuario(req);
     const estado = obtenerEstadoUsuario(idUsuario);
     const { conectado } = req.body;
 
-    estado.conectado = Boolean(conectado);
-    if (!estado.conectado) {
+    const nuevoEstado = Boolean(conectado);
+    estado.conectado = nuevoEstado;
+    estadoGlobal.conectado = nuevoEstado;
+
+    if (!nuevoEstado) {
         estado.bpm = 0;
         estado.modo = 'DESCONECTADO';
     } else {
-        estado.bpm = 75;
+        estado.bpm = 78;
         estado.modo = 'MODO APERTURA';
         ultimoUsuarioVinculado = String(idUsuario);
     }
 
     res.status(200).json({
-        mensaje: estado.conectado ? 'Dispositivo vinculado al usuario' : 'Dispositivo desvinculado del usuario',
+        mensaje: nuevoEstado ? 'Dispositivo vinculado' : 'Dispositivo desvinculado',
         id_usuario: idUsuario,
         estado: estado
     });
@@ -227,14 +262,17 @@ const encolarNotificacionParaUsuario = (idUsuario, notif) => {
     const tituloConciso = String(notif.titulo || 'Alerta').trim().slice(0, 30);
     const mensajeCondensado = String(notif.mensaje || '').trim().slice(0, 45);
 
-    cola.push({
+    const item = {
         id: Date.now(),
         titulo: tituloConciso,
         mensaje: mensajeCondensado,
         icono: notif.icono || 'compra',
         vibrar: notif.vibrar !== undefined ? Boolean(notif.vibrar) : true,
         timestamp: new Date().toISOString()
-    });
+    };
+
+    cola.push(item);
+    colaGlobal.push(item);
 };
 
 module.exports = {
