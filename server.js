@@ -8,6 +8,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const contactoRoutes = require('./routes/contactoRoutes');
 const wearableRoutes = require('./routes/wearableRoutes');
 const db = require('./config/db');
+const s3Routes = require('./routes/s3Routes');
 const app = express();
 
 // Configuración de CORS con soporte para Vercel y dominios autorizados
@@ -59,6 +60,7 @@ app.use('/api/pedidos', pedidoRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/contacto', contactoRoutes);
 app.use('/api/wearable', wearableRoutes);
+app.use('/api/s3', s3Routes);
 
 // Ruta de prueba
 app.get('/', (req, res) => {
