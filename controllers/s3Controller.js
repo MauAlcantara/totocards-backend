@@ -1,6 +1,6 @@
 const { PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const s3Client = require('../config/S3');
+const s3Client = require('../config/s3');
 
 const obtenerPresignedUrl = async (req, res) => {
   try {
