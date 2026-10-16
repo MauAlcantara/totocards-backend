@@ -10,8 +10,9 @@ const obtenerPresignedUrl = async (req, res) => {
       return res.status(400).json({ mensaje: 'Nombre y tipo de archivo requeridos.' });
     }
 
-    // Clave única para evitar sobreescribir archivos con el mismo nombre
-    const fileKey = `uploads/${Date.now()}_${fileName}`;
+    // Limpiar caracteres especiales o espacios en el nombre del archivo
+    const nombreLimpio = fileName.replace(/\s+/g, '_');
+    const fileKey = `uploads/${Date.now()}_${nombreLimpio}`;
 
     const command = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
@@ -19,7 +20,6 @@ const obtenerPresignedUrl = async (req, res) => {
       ContentType: fileType
     });
 
-    // Enlace temporal con vigencia de 5 minutos (300 segundos)
     const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
 
     res.json({
